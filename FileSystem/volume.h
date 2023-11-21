@@ -12,7 +12,8 @@ struct superBlock {//32 bytes
 
 struct entry { //32 bytes
 	BYTE fileName[8];
-	BYTE fileFormat[4];
+	BYTE fileFormat[3];
+	BYTE fileStatus[1];
 	BYTE fileSize[4];
 	BYTE startBlock[4];
 	BYTE password[12];
@@ -26,18 +27,18 @@ class Volume {
 	private:
 		
 		bool _createBlankVolume(); // tao o dia trong
+		bool _verifyVolumePassword(string password);
+		bool _changeVolumePassword(string newPassword);
 
 		bool _createSupperBlock(int volumeSize);
 		bool _readSuperBlock(string volumeName);
 		bool _writeSuperBlock(superBlock sb, LPCWSTR volumeName);
-		bool _verifyVolumePassword(string password);
-		bool _changeVolumePassword(string newPassword);
-		//superBlock _readableSuperBlock(superBlock sb);
+
 		// read and write entry table
-
-		bool _createEntry();
-
-		// read and write file
+		entry _createEntry(string name, string format, int size, int start);
+		bool _writeEntryTable(vector<entry> entryTable, LPCWSTR fileName);
+		bool _readEntryTable(vector<entry>& entryTable, LPCWSTR fileName);
+		// import and export file
 
 
 		BYTE* _readBlock(int block, LPCWSTR fileName);
@@ -55,5 +56,7 @@ class Volume {
 		bool readVolume();
 		bool changeVolumePassword();
 
-		void printSuperBlock(const superBlock& sb);
+		void printSuperBlock(superBlock sb);
+		void printEntry(entry i);
+		void testEntry();
 };

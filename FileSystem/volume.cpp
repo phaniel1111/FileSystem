@@ -25,6 +25,38 @@ bool Volume::_createBlankVolume() {
 	f.close();
 	return true;
 }
+bool Volume::_verifyVolumePassword(string password) {
+	string hash = md5(password);
+	for (int i = 0; i < 16; i++)
+	{
+		string pair = hash.substr(i * 2, 2);
+		BYTE t1 = hexToByte(pair);
+		BYTE t2 = this->spBlock.password[i];
+		if (t1 != t2)
+			return false;
+	}
+	return true;
+}
+bool Volume::_changeVolumePassword(string newPassword)
+{
+	string hash = md5(newPassword);
+	for (int i = 0; i < 16; i++)
+	{
+		string pair = hash.substr(i * 2, 2);
+		this->spBlock.password[i] = hexToByte(pair);
+	}
+	string path = this->volumeName + this->extentionTail;
+	wstring temp = wstring(path.begin(), path.end());
+	LPCWSTR sw = temp.c_str();
+	cout << "test 1" << endl;
+	cout << sw << endl;
+	this->printSuperBlock(this->spBlock);
+	if (!this->_writeSuperBlock(this->spBlock, sw))
+		return false;
+	cout << "test 2" << endl;
+
+	return true;
+}
 
 // create super block
 bool Volume::_createSupperBlock(int volumeSize) {
@@ -64,7 +96,6 @@ bool Volume::_readSuperBlock(string volumeName) {
 	};
 	return true;
 }
-
 // check if superblock is written successfully
 bool Volume::_writeSuperBlock(superBlock sb, LPCWSTR volumeName) {
 	DWORD bytesRead;
@@ -82,58 +113,93 @@ bool Volume::_writeSuperBlock(superBlock sb, LPCWSTR volumeName) {
 	return isOK;
 }
 
-bool Volume::_verifyVolumePassword(string password) {
-	string hash = md5(password);
-	for (int i = 0; i < 16; i++)
-	{
-		string pair = hash.substr(i * 2, 2);
-		BYTE t1 = hexToByte(pair);
-		BYTE t2 = this->spBlock.password[i];
-		if ( t1 != t2 )
-			return false;
-	}
-	return true;
-}
-
-bool Volume::_changeVolumePassword(string newPassword)
+entry Volume::_createEntry(string name, string format, int size, int start)
 {
-	string hash = md5(newPassword);
-	for (int i = 0; i < 16; i++)
+	entry et;
+
+	for (int i = 0; i < 8; i++)
 	{
-		string pair = hash.substr(i * 2, 2);
-		this->spBlock.password[i] = hexToByte(pair);
+		if (i < name.length())
+			et.fileName[i] = name[i];
+		else
+			et.fileName[i] = BYTE(0);
 	}
-	string path = this->volumeName + this->extentionTail;
-	wstring temp = wstring(path.begin(), path.end());
-	LPCWSTR sw = temp.c_str();
-	cout << "test 1" << endl;
-	cout << sw << endl;
-	this->printSuperBlock(this->spBlock);
-	if (!this->_writeSuperBlock(this->spBlock, sw))
-		return false;
-	cout << "test 2" << endl;
+	for (int i = 0; i < 3; i++)
+	{
+		if (i < format.length())
+			et.fileFormat[i] = format[i];
+		else
+			et.fileFormat[i] = BYTE(0);
+	}
+	et.fileStatus[0] = BYTE('a');
+	BYTE* temp = decToHexaLE(size, 4);
+	for (int i = 0; i < 4; i++)
+		et.fileSize[i] = temp[i];
+	BYTE* temp1 = decToHexaLE(start, 4);
+	for (int i = 0; i < 4; i++)
+		et.startBlock[i] = temp1[i];
+	//password
 
-	return true;
+	return et;
 }
 
-bool Volume::_createEntry()
-{
-	entry e;
+bool Volume::_writeEntryTable(vector<entry> entryTable, LPCWSTR fileName) {
+	DWORD bytesRead;
+	HANDLE hFile;
+	bool flag;
+	hFile = CreateFile(fileName,
+		GENERIC_WRITE,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_EXISTING,
+		0,
+		NULL);
+	int i = 0;
+	for (auto& element : entryTable) {
+		SetFilePointer(hFile, 32 + i, NULL, FILE_BEGIN);
+		flag = WriteFile(hFile, &element, 32, &bytesRead, NULL);
+		i += 32;
+	}
+	CloseHandle(hFile);
+	return flag;
+}
+/*
+Input password: ad
+superBlockSize: 32
+bytePerBlock: 512
+blocksInVolume: 4096
+entryTableSize: 131104
+password: 523af537946b79c4f8369ed39ba78605
+unused: 0 0 0 0 0
+*/
+bool Volume::_readEntryTable(vector<entry>& entryTable, LPCWSTR fileName) {
+	BYTE* buffer = new BYTE[BytePerBlock];
+	int entryBlocks = reverseByte(this->spBlock.entryTableSize,4)/ BytePerBlock;
+	for (int i = 0; i < entryBlocks; i++)
+	{
+		buffer = this->_readBlock(i, fileName);
+		if (isBufferEmpty(buffer, BytePerBlock))
+			break;
 
+		for (int j = 0; j < BytePerBlock; j += 32) { // j/32
+			if (isEntryEmpty(j, buffer))
+				goto endLoops;
+
+			entry et;
+			memcpy(et.fileName, buffer + j, 8);
+			memcpy(et.fileFormat, buffer + j + 8, 3);
+			memcpy(et.fileStatus, buffer + j + 11, 1);
+			memcpy(et.fileSize, buffer + j + 12, 4);
+			memcpy(et.startBlock, buffer + j + 16, 4);
+			memcpy(et.password, buffer + j + 20, 12);
+			entryTable.push_back(et);
+		}
+	}
+	endLoops:
+	entryTable.erase(entryTable.begin());
+	delete[] buffer;
 	return true;
 }
-/*superBlock Volume::_readableSuperBlock(superBlock sb) {
-	superBlock spB;
-
-	spB.superBlockSize = reverseByte(sb.superBlockSize, 1);
-	spB.bytePerBlock = reverseByte(sb.bytePerBlock, 2);
-	spB.blocksInVolume = reverseByte(sb.blocksInVolume, 4);
-	spB.entryTableSize = reverseByte(sb.entryTableSize, 4);
-	for (int i = 0; i < 8; i++) {
-		spB.password[i] = sb.password[i];
-	}
-	return spB;
-}*/
 
 BYTE* Volume::_readBlock(int block, LPCWSTR fileName) {
 	DWORD bytesRead;
@@ -171,7 +237,7 @@ bool Volume::_writeBlock(int block, BYTE* buffer, LPCWSTR fileName) {
 	return flag;
 }
 
-// console 1st function
+// console open/create volume
 bool Volume::createNewVolume() {
 	string volumeName;
 	int volumeSize;
@@ -219,21 +285,22 @@ bool Volume::createNewVolume() {
 }
 
 bool Volume::readVolume() {
+	string vN; //volume name
 	cout << "Volume name: ";
-	cin >> volumeName;
+	cin >> vN;
 	
-	if (volumeName.length() >= 4 && volumeName.substr(volumeName.length() - 4) != ".drs") {
+	if (vN.length() >= 4 && vN.substr(vN.length() - 4) != ".drs") {
 		// If it doesn't end with ".drs", append it
-		volumeName += this->extentionTail;
+		vN += this->extentionTail;
 	}
 	//kiem tra file co ton tai
-	ifstream fileCheck(volumeName);
+	ifstream fileCheck(vN);
 	if (!fileCheck.is_open()) {
 		fileCheck.close();
 		cout << "Volume isn't existed!" << endl;
 		return false;  // If file existed return false
 	}
-	if (!this->_readSuperBlock(volumeName))
+	if (!this->_readSuperBlock(vN))
 	{
 		cout << "Fail to read volume!" << endl;
 		return false;
@@ -248,11 +315,11 @@ bool Volume::readVolume() {
 		return false;
 	}
 	// xoa phan mo trong
-	if (volumeName.length() >= 4 && volumeName.compare(volumeName.length() - 4, 4, this->extentionTail) == 0) {
+	if (vN.length() >= 4 && vN.compare(vN.length() - 4, 4, this->extentionTail) == 0) {
 		// Remove the suffix
-		volumeName.erase(volumeName.length() - 4);
+		vN.erase(vN.length() - 4);
 	}
-	this->volumeName = volumeName;
+	this->volumeName = vN;
 
 
 	// read entry table !!
@@ -263,6 +330,7 @@ bool Volume::readVolume() {
 	return true;
 }
 
+// console modify password
 bool Volume::changeVolumePassword() {
 	string pw;
 	cout << "Input password: ";
@@ -284,22 +352,69 @@ bool Volume::changeVolumePassword() {
 	return true;
 }
 
-void Volume::printSuperBlock(const superBlock& sb) {
-	std::cout << "superBlockSize: " << static_cast<int>(sb.superBlockSize[0]) << std::endl;
-	std::cout << "bytePerBlock: " << (sb.bytePerBlock[1] << 8 | sb.bytePerBlock[0]) << std::endl;
-	std::cout << "blocksInVolume: " << (sb.blocksInVolume[3] << 24 | sb.blocksInVolume[2] << 16 | sb.blocksInVolume[1] << 8 | sb.blocksInVolume[0]) << std::endl;
-	std::cout << "entryTableSize: " << (sb.entryTableSize[3] << 24 | sb.entryTableSize[2] << 16 | sb.entryTableSize[1] << 8 | sb.entryTableSize[0]) << std::endl;
+void Volume::printSuperBlock(superBlock sb) {
+	cout << "superBlockSize: " << reverseByte(sb.superBlockSize, 1) << endl;
+	cout << "bytePerBlock: " << reverseByte(sb.bytePerBlock,2) << endl;
+	cout << "blocksInVolume: " << reverseByte(sb.blocksInVolume,4) << endl;
+	cout << "entryTableSize: " << reverseByte(sb.entryTableSize,4) << endl;
 
-	std::cout << "password: ";
+	cout << "password: ";
 	for (int i = 0; i < 16; ++i) {
-		std::cout << byteToHex(sb.password[i]);
+		cout << byteToHex(sb.password[i]);
 	}
-	std::cout << std::endl;
+	cout << endl;
 
-	std::cout << "unused: ";
+	cout << "unused: ";
 	for (int i = 0; i < 5; ++i) {
-		std::cout << static_cast<int>(sb.unused[i]) << " ";
+		cout << static_cast<int>(sb.unused[i]) << " ";
 	}
-	std::cout << std::endl;
+	cout << endl;
 }
 
+void Volume::printEntry(entry en) {
+	//cout << "Name\t\tFormat\t\tFile size (byte)" << endl;
+	//for (auto& element : this->entryTable) {
+		
+	//}
+	for (int i = 0; i < sizeof(en.fileName); ++i)
+		cout << en.fileName[i];
+	cout << "\t";
+	for (int i = 0; i < sizeof(en.fileFormat); ++i)
+		cout << en.fileFormat[i];
+	cout << "\t";
+	cout << en.fileStatus[0] << "\t";
+	cout << reverseByte(en.fileSize, 4) << "\t";
+	cout << reverseByte(en.startBlock, 4) << "\t";
+	for (int i = 0; i < sizeof(en.password); ++i)
+		cout << en.password[i];
+	cout << "\t";
+}
+
+
+// USE FOR TESTING
+void Volume::testEntry(){
+	string vN = this->volumeName + this->extentionTail;
+	wstring temp = wstring(vN.begin(), vN.end());
+	LPCWSTR sw = temp.c_str();
+	/*
+	entry t = this->_createEntry("filename", "txt", 8, 257);
+	this->printEntry(t);
+	cout << endl;
+
+	
+	vector<entry> enT;
+	enT.push_back(t);
+	if(this->_writeEntryTable(enT,sw))
+		cout << "write entry table successfully" << endl;
+	else
+		cout << "fail to write entry table" << endl;
+	*/
+	vector<entry> enT2;
+	if (this->_readEntryTable(enT2, sw))
+		cout << "read entry table successfully" << endl;
+	else
+		cout << "fail to read entry table" << endl;
+	cout << endl << enT2.size() <<endl;
+	if(enT2.size() > 0)
+		this->printEntry(enT2[0]);
+}

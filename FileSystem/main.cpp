@@ -32,7 +32,11 @@ int main() {
 	do {
 		cout << "-----" << myFS.volumeName << ".drs-----" << endl;
 		cout << "Enter 1: Change volume password" << endl;
-		cout << "Enter 2: Open existed volume" << endl;
+		cout << "Enter 2: Show files list" << endl;
+		cout << "Enter 3: Modify file password" << endl;
+		cout << "Enter 4: Import file" << endl;
+		cout << "Enter 5: Export file" << endl;
+		cout << "Enter 6: Remove file" << endl;
 		cout << "Enter 0: Exit" << endl;
 		cout << "Enter your choice: ";
 		cin >> btn1;
@@ -41,6 +45,17 @@ int main() {
 		case 1:
 			myFS.changeVolumePassword();
 			break;
+		case 2:
+			myFS.testEntry();
+			break;
+		case 3:
+			break; 
+		case 4:
+			break; 
+		case 5:
+			break; 
+		case 6:
+			break;  
 		default:
 			break;
 		}

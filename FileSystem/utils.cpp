@@ -25,33 +25,33 @@ BYTE* createBlankOffets(int n) {
 	return offsets;
 }
 
-BYTE hexToByte(const std::string& hexString) {
+BYTE hexToByte(const string& hexString) {
 	if (hexString.size() != 2) {
 		// Handle invalid input
-		throw std::invalid_argument("Input must be a two-character hexadecimal string");
+		throw invalid_argument("Input must be a two-character hexadecimal string");
 	}
 	try {
 		// Convert the hexadecimal string to an integer
-		int hexValue = std::stoi(hexString, 0, 16);
+		int hexValue = stoi(hexString, 0, 16);
 
 		// Convert the integer to an unsigned char
 		unsigned char result = static_cast<unsigned char>(hexValue);
 
 		return result;
 	}
-	catch (const std::out_of_range& e) {
+	catch (const out_of_range& e) {
 		// Handle out-of-range error
-		throw std::out_of_range("Hexadecimal value out of range for unsigned char");
+		throw out_of_range("Hexadecimal value out of range for unsigned char");
 	}
-	catch (const std::invalid_argument& e) {
+	catch (const invalid_argument& e) {
 		// Handle invalid argument error
-		throw std::invalid_argument("Invalid hexadecimal string");
+		throw invalid_argument("Invalid hexadecimal string");
 	}
 }
 
 string byteToHex(unsigned char byte) {
 	std::ostringstream oss;
-	oss << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(byte);
+	oss << setw(2) << setfill('0') << hex << static_cast<int>(byte);
 	return oss.str();
 }
 int reverseByte(BYTE* byte, unsigned int count)
@@ -62,9 +62,27 @@ int reverseByte(BYTE* byte, unsigned int count)
 	return result;
 }
 
-LPCWSTR stringToLPCWSTR(string orig) {
-	wstring t = wstring(orig.begin(), orig.end());
-	return  t.c_str();
+bool isBufferEmpty(const BYTE* buffer, size_t size) {
+	// Check if the buffer is null
+	if (buffer == nullptr) {
+		return true;
+	}
 
+	// Check if all bytes in the buffer are 0
+	for (size_t i = 0; i < size; ++i) {
+		if (buffer[i] != BYTE(0)) {
+			return false;
+		}
+	}
+
+	return true;
 }
 
+bool isEntryEmpty(int index, BYTE* buffer) {
+	for (size_t i = index; i < index + 32; ++i) {
+		if (buffer[i] != BYTE(0)) {
+			return false;
+		}
+	}
+	return true;
+}
