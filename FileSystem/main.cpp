@@ -25,7 +25,6 @@ int main() {
 			// open existed volume
 			btn2 = myFS.readVolume();
 		}
-		system("pause");
 		system("cls");
 	} while (!btn2);
 

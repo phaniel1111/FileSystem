@@ -65,7 +65,6 @@ bool Volume::_readSuperBlock(string volumeName) {
 	return true;
 }
 
-
 // check if superblock is written successfully
 bool Volume::_writeSuperBlock(superBlock sb, LPCWSTR volumeName) {
 	DWORD bytesRead;
@@ -83,6 +82,18 @@ bool Volume::_writeSuperBlock(superBlock sb, LPCWSTR volumeName) {
 	return isOK;
 }
 
+bool Volume::_verifyVolumePassword(string password) {
+	string hash = md5(password);
+	for (int i = 0; i < 16; i++)
+	{
+		string pair = hash.substr(i * 2, 2);
+		BYTE t1 = hexToByte(pair);
+		BYTE t2 = this->spBlock.password[i];
+		if ( t1 != t2 )
+			return false;
+	}
+	return true;
+}
 
 /*superBlock Volume::_readableSuperBlock(superBlock sb) {
 	superBlock spB;
@@ -181,8 +192,6 @@ bool Volume::createNewVolume() {
 }
 
 bool Volume::readVolume() {
-	string t;
-
 	cout << "Volume name: ";
 	cin >> volumeName;
 	
@@ -202,14 +211,25 @@ bool Volume::readVolume() {
 		cout << "Fail to read volume!" << endl;
 		return false;
 	}
-	// read entry table !!
-
+	//check volume password
+	string pw;
+	cout << "Input password: ";
+	cin >> pw;
+	if (!this->_verifyVolumePassword(pw))
+	{
+		cout << "Wrong password!" << endl;
+		return false;
+	}
 	// xoa phan mo trong
 	if (volumeName.length() >= 4 && volumeName.compare(volumeName.length() - 4, 4, this->extentionTail) == 0) {
 		// Remove the suffix
 		volumeName.erase(volumeName.length() - 4);
 	}
 	this->volumeName = volumeName;
+
+
+	// read entry table !!
+
 
 	printSuperBlock(this->spBlock);
 

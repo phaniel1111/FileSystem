@@ -30,6 +30,7 @@ class Volume {
 		bool _createSupperBlock(int volumeSize);
 		bool _readSuperBlock(string volumeName);
 		bool _writeSuperBlock(superBlock sb, LPCWSTR volumeName);
+		bool _verifyVolumePassword(string password);
 		//superBlock _readableSuperBlock(superBlock sb);
 		// read and write entry table
 		// read and write file
