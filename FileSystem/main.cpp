@@ -25,9 +25,28 @@ int main() {
 			// open existed volume
 			btn2 = myFS.readVolume();
 		}
+		system("pause");
 		system("cls");
 	} while (!btn2);
 
+	do {
+		cout << "-----" << myFS.volumeName << ".drs-----" << endl;
+		cout << "Enter 1: Change volume password" << endl;
+		cout << "Enter 2: Open existed volume" << endl;
+		cout << "Enter 0: Exit" << endl;
+		cout << "Enter your choice: ";
+		cin >> btn1;
+
+		switch (btn1) {
+		case 1:
+			myFS.changeVolumePassword();
+			break;
+		default:
+			break;
+		}
+		system("pause");
+		system("cls");
+	} while (btn1);
 	// cac tinh nang truy xuat khac
 
 

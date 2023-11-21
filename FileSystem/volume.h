@@ -10,12 +10,12 @@ struct superBlock {//32 bytes
 	BYTE unused[5];
 };
 
-struct entryTable { //32 bytes
+struct entry { //32 bytes
 	BYTE fileName[8];
 	BYTE fileFormat[4];
-	BYTE password[12];
 	BYTE fileSize[4];
 	BYTE startBlock[4];
+	BYTE password[12];
 };
 
 struct dataBlock {
@@ -31,16 +31,21 @@ class Volume {
 		bool _readSuperBlock(string volumeName);
 		bool _writeSuperBlock(superBlock sb, LPCWSTR volumeName);
 		bool _verifyVolumePassword(string password);
+		bool _changeVolumePassword(string newPassword);
 		//superBlock _readableSuperBlock(superBlock sb);
 		// read and write entry table
+
+		bool _createEntry();
+
 		// read and write file
+
 
 		BYTE* _readBlock(int block, LPCWSTR fileName);
 		bool _writeBlock(int block, BYTE* buffer, LPCWSTR fileName);
 	public:
 		string volumeName;
 		int volumeSize; //in MB
-		vector<entryTable> entryTable;
+		vector<entry> entryTable;
 		superBlock spBlock;
 		string extentionTail = ".drs";
 		Volume();
@@ -48,7 +53,7 @@ class Volume {
 
 		bool createNewVolume();
 		bool readVolume();
-
+		bool changeVolumePassword();
 
 		void printSuperBlock(const superBlock& sb);
 };

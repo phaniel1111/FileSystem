@@ -95,6 +95,33 @@ bool Volume::_verifyVolumePassword(string password) {
 	return true;
 }
 
+bool Volume::_changeVolumePassword(string newPassword)
+{
+	string hash = md5(newPassword);
+	for (int i = 0; i < 16; i++)
+	{
+		string pair = hash.substr(i * 2, 2);
+		this->spBlock.password[i] = hexToByte(pair);
+	}
+	string path = this->volumeName + this->extentionTail;
+	wstring temp = wstring(path.begin(), path.end());
+	LPCWSTR sw = temp.c_str();
+	cout << "test 1" << endl;
+	cout << sw << endl;
+	this->printSuperBlock(this->spBlock);
+	if (!this->_writeSuperBlock(this->spBlock, sw))
+		return false;
+	cout << "test 2" << endl;
+
+	return true;
+}
+
+bool Volume::_createEntry()
+{
+	entry e;
+
+	return true;
+}
 /*superBlock Volume::_readableSuperBlock(superBlock sb) {
 	superBlock spB;
 
@@ -236,6 +263,27 @@ bool Volume::readVolume() {
 	return true;
 }
 
+bool Volume::changeVolumePassword() {
+	string pw;
+	cout << "Input password: ";
+	cin >> pw;
+	if (!this->_verifyVolumePassword(pw))
+	{
+		cout << "Wrong password!" << endl;
+		return false;
+	}
+	string newPw;
+	cout << "Input new password: ";
+	cin >> newPw;
+	if (!this->_changeVolumePassword(newPw))
+	{
+		cout << "Fail to change password!" << endl;
+		return false;
+	}
+	cout << "Change password successfully!" << endl;
+	return true;
+}
+
 void Volume::printSuperBlock(const superBlock& sb) {
 	std::cout << "superBlockSize: " << static_cast<int>(sb.superBlockSize[0]) << std::endl;
 	std::cout << "bytePerBlock: " << (sb.bytePerBlock[1] << 8 | sb.bytePerBlock[0]) << std::endl;
@@ -254,3 +302,4 @@ void Volume::printSuperBlock(const superBlock& sb) {
 	}
 	std::cout << std::endl;
 }
+
