@@ -6,14 +6,14 @@ Volume::~Volume() {}
 
 // create blank volume
 bool Volume::_createBlankVolume() {
-	ifstream fileCheck(this->volumeName);
+	ifstream fileCheck(this->volumeName + this->extentionTail);
 	if (fileCheck.is_open()) {
 		fileCheck.close();
 		return false;  // If file existed return false
 	}
 
 	fstream f;
-	f.open(this->volumeName, ios::trunc | ios::out);
+	f.open(this->volumeName + this->extentionTail, ios::trunc | ios::out);
 	BYTE block[BytePerBlock]; // each block take 512 byte
 	for (int i = 0; i < BytePerBlock; i++) {
 		block[i] = BYTE(0);
@@ -48,13 +48,8 @@ bool Volume::_changeVolumePassword(string newPassword)
 	string path = this->volumeName + this->extentionTail;
 	wstring temp = wstring(path.begin(), path.end());
 	LPCWSTR sw = temp.c_str();
-	cout << "test 1" << endl;
-	cout << sw << endl;
-	this->printSuperBlock(this->spBlock);
 	if (!this->_writeSuperBlock(this->spBlock, sw))
 		return false;
-	cout << "test 2" << endl;
-
 	return true;
 }
 
@@ -113,7 +108,7 @@ bool Volume::_writeSuperBlock(superBlock sb, LPCWSTR volumeName) {
 	return isOK;
 }
 
-entry Volume::_createEntry(string name, string format, int size, int start)
+entry Volume::_createEntry(string name, string format, string password, int size, int start)
 {
 	entry et;
 
@@ -139,6 +134,20 @@ entry Volume::_createEntry(string name, string format, int size, int start)
 	for (int i = 0; i < 4; i++)
 		et.startBlock[i] = temp1[i];
 	//password
+	if (password != "0")
+	{
+		string hash = md5(password);
+		for (int i = 0; i < 12; i++)
+		{
+			string pair = hash.substr(i * 2, 2);
+			et.password[i] = hexToByte(pair);
+		}
+	}
+	else
+	{
+		for (int i = 0; i < 12; i++)
+			et.password[i] = BYTE(0);
+	}
 
 	return et;
 }
@@ -201,6 +210,49 @@ bool Volume::_readEntryTable(vector<entry>& entryTable, LPCWSTR fileName) {
 	return true;
 }
 
+entry* Volume::_searchEntry(string fn) {
+	// Copy string characters to unsigned char array
+	for (entry& e : this->entryTable) {
+		if (memcmp(e.fileName, fn.c_str(), sizeof(e.fileName)) == 0) {
+			return &e; // Returning a pointer to the found entry
+		}
+	}
+	return nullptr; // Returning nullptr if entry is not found
+}
+bool Volume::_verifyFilePassword(string password, entry e) {
+	string hash = md5(password);
+	for (int i = 0; i < 12; i++)
+	{
+		string pair = hash.substr(i * 2, 2);
+		BYTE t1 = hexToByte(pair);
+		BYTE t2 = e.password[i];
+		if (t1 != t2)
+			return false;
+	}
+	return true;
+}
+bool Volume::_changeFilePassword(entry e, string password) {
+	string hash = md5(password);
+	for (int i = 0; i < 12; i++)
+	{
+		string pair = hash.substr(i * 2, 2);
+		e.password[i] = hexToByte(pair);
+	}
+	for (entry& en : this->entryTable) {
+		if (memcmp(en.fileName, e.fileName, sizeof(en.fileName)) == 0) {
+			en = e;
+		}
+	}
+	string path = this->volumeName + this->extentionTail;
+	wstring temp = wstring(path.begin(), path.end());
+	LPCWSTR sw = temp.c_str();
+
+	if (!this->_writeEntryTable(this->entryTable, sw))
+		return false;
+
+	return true;
+}
+
 BYTE* Volume::_readBlock(int block, LPCWSTR fileName) {
 	DWORD bytesRead;
 	HANDLE hFile;
@@ -239,18 +291,20 @@ bool Volume::_writeBlock(int block, BYTE* buffer, LPCWSTR fileName) {
 
 // console open/create volume
 bool Volume::createNewVolume() {
-	string volumeName;
-	int volumeSize;
+	string vN;
+	int vS;
 	cout << "Volume name: ";
-	cin >> volumeName;
+	cin >> vN;
 	cout << "Volume size (MB): ";
-	cin >> volumeSize;
-	if (volumeName.length() >= 4 && volumeName.substr(volumeName.length() - 4) != ".drs") {
-		// If it doesn't end with ".drs", append it
-		volumeName += this->extentionTail;
+	cin >> vS;
+	
+	// xoa phan mo trong
+	if (vN.length() >= 4 && vN.compare(vN.length() - 4, 4, this->extentionTail) == 0) {
+		// Remove the suffix
+		vN.erase(vN.length() - 4);
 	}
-	this->volumeName = volumeName;
-	this->volumeSize = volumeSize;
+	this->volumeName = vN;
+	this->volumeSize = vS;
 
 	if (this->_createBlankVolume()) {
 		this->_createSupperBlock(volumeSize);
@@ -267,7 +321,8 @@ bool Volume::createNewVolume() {
 			}
 		}
 
-		wstring temp = wstring(volumeName.begin(), volumeName.end());
+		string t = this->volumeName + this->extentionTail;
+		wstring temp = wstring(t.begin(), t.end());
 		LPCWSTR sw = temp.c_str();
 		if (this->_writeSuperBlock(this->spBlock, sw)) {
 			cout << "Create volume successfully!" << endl;
@@ -306,14 +361,24 @@ bool Volume::readVolume() {
 		return false;
 	}
 	//check volume password
-	string pw;
-	cout << "Input password: ";
-	cin >> pw;
-	if (!this->_verifyVolumePassword(pw))
+	if (this->spBlock.password[0] != NULL)
 	{
-		cout << "Wrong password!" << endl;
-		return false;
+		string pw;
+		cout << "Input password: ";
+		cin >> pw;
+		if (!this->_verifyVolumePassword(pw))
+		{
+			cout << "Wrong password!" << endl;
+			return false;
+		}
 	}
+	
+	// read entry table
+	wstring temp = wstring(vN.begin(), vN.end());
+	LPCWSTR sw = temp.c_str();
+	if (!this->_readEntryTable(this->entryTable, sw))
+		return false;
+
 	// xoa phan mo trong
 	if (vN.length() >= 4 && vN.compare(vN.length() - 4, 4, this->extentionTail) == 0) {
 		// Remove the suffix
@@ -321,24 +386,21 @@ bool Volume::readVolume() {
 	}
 	this->volumeName = vN;
 
-
-	// read entry table !!
-
-
-	printSuperBlock(this->spBlock);
-
 	return true;
 }
 
 // console modify password
 bool Volume::changeVolumePassword() {
-	string pw;
-	cout << "Input password: ";
-	cin >> pw;
-	if (!this->_verifyVolumePassword(pw))
+	if (this->spBlock.password[0] != BYTE(0))
 	{
-		cout << "Wrong password!" << endl;
-		return false;
+		string pw;
+		cout << "Input password: ";
+		cin >> pw;
+		if (!this->_verifyVolumePassword(pw))
+		{
+			cout << "Wrong password!" << endl;
+			return false;
+		}
 	}
 	string newPw;
 	cout << "Input new password: ";
@@ -372,22 +434,57 @@ void Volume::printSuperBlock(superBlock sb) {
 }
 
 void Volume::printEntry(entry en) {
-	//cout << "Name\t\tFormat\t\tFile size (byte)" << endl;
-	//for (auto& element : this->entryTable) {
-		
-	//}
 	for (int i = 0; i < sizeof(en.fileName); ++i)
 		cout << en.fileName[i];
-	cout << "\t";
+	cout << "\t\t";
 	for (int i = 0; i < sizeof(en.fileFormat); ++i)
 		cout << en.fileFormat[i];
-	cout << "\t";
-	cout << en.fileStatus[0] << "\t";
+	cout << "\t\t";
+	//cout << en.fileStatus[0] << "\t";
 	cout << reverseByte(en.fileSize, 4) << "\t";
-	cout << reverseByte(en.startBlock, 4) << "\t";
+	/*cout << reverseByte(en.startBlock, 4) << "\t";
 	for (int i = 0; i < sizeof(en.password); ++i)
-		cout << en.password[i];
-	cout << "\t";
+		cout << en.password[i];*/
+	cout << endl;
+}
+
+//console print entry table
+void Volume::printEntryTable() {
+	cout << "Name\t\tFormat\t\tSize" << endl;
+	for (auto& element : this->entryTable) {
+		this->printEntry(element);
+	}
+}
+bool Volume::changeFilePassword() {
+	string fn;
+	cout << "Input file name: ";
+	cin >> fn;
+	entry* e = this->_searchEntry(fn);
+	if (e == nullptr) {
+		cout << "File not found!" << endl;
+		return false;
+	}
+	if (e->password[0] != BYTE(0))
+	{
+		string pw;
+		cout << "Input password: ";
+		cin >> pw;
+		if (!this->_verifyFilePassword(pw, *e))
+		{
+			cout << "Wrong password!" << endl;
+			return false;
+		}
+	}
+	string newPw;
+	cout << "Input new password: ";
+	cin >> newPw;
+	if (!this->_changeFilePassword(*e, newPw))
+	{
+		cout << "Fail to change password!" << endl;
+		return false;
+	}
+	cout << "Change password successfully!" << endl;
+	return true;
 }
 
 

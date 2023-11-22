@@ -35,9 +35,12 @@ class Volume {
 		bool _writeSuperBlock(superBlock sb, LPCWSTR volumeName);
 
 		// read and write entry table
-		entry _createEntry(string name, string format, int size, int start);
+		entry _createEntry(string name, string format, string password, int size, int start);
 		bool _writeEntryTable(vector<entry> entryTable, LPCWSTR fileName);
 		bool _readEntryTable(vector<entry>& entryTable, LPCWSTR fileName);
+		entry* _searchEntry(string filename);
+		bool _verifyFilePassword(string password, entry e);
+		bool _changeFilePassword(entry e, string password);
 		// import and export file
 
 
@@ -58,5 +61,8 @@ class Volume {
 
 		void printSuperBlock(superBlock sb);
 		void printEntry(entry i);
+		void printEntryTable();
+
+		bool changeFilePassword();
 		void testEntry();
 };

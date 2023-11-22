@@ -6,7 +6,6 @@ int main() {
 	Volume myFS;
 	bool btn2 = 0;
 	int btn1 = 0;
-
 	// mo hoac tao volume
 	do {
 		do {
@@ -46,9 +45,10 @@ int main() {
 			myFS.changeVolumePassword();
 			break;
 		case 2:
-			myFS.testEntry();
+			myFS.printEntryTable();
 			break;
 		case 3:
+			myFS.changeFilePassword();
 			break; 
 		case 4:
 			break; 
