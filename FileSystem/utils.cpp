@@ -82,3 +82,11 @@ bool isEntryEmpty(int index, BYTE* buffer) {
 	}
 	return true;
 }
+BYTE* createBlankOffets(int n) {
+	BYTE* offsets = new BYTE[n];
+
+	for (int i = 0; i < n; i++) {
+		offsets[i] = BYTE(0);
+	}
+	return offsets;
+}

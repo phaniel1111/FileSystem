@@ -55,9 +55,9 @@ int main() {
 			break; 
 		case 5:
 			myFS.exportFile();
-
 			break; 
 		case 6:
+			myFS.removeFile();
 			break;  
 		default:
 			break;

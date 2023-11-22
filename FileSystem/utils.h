@@ -7,3 +7,4 @@ string byteToHex(unsigned char byte);
 int reverseByte(BYTE* byte, unsigned int count);
 bool isBufferEmpty(const BYTE* buffer, size_t size);
 bool isEntryEmpty(int index, BYTE* buffer);
+BYTE* createBlankOffets(int n);

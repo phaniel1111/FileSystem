@@ -213,7 +213,9 @@ bool Volume::_readEntryTable(vector<entry>& entryTable, LPCWSTR fileName) {
 			memcpy(et.fileSize, buffer + j + 12, 4);
 			memcpy(et.startBlock, buffer + j + 16, 4);
 			memcpy(et.password, buffer + j + 20, 12);
-			entryTable.push_back(et);
+			
+			if(et.fileStatus[0] != BYTE('d'))
+				entryTable.push_back(et);
 		}
 	}
 	endLoops:
@@ -274,6 +276,45 @@ int Volume::_getStartBlock() {
 	int lastEntryEndBlock = lastEntryBlock + lastEntrySize / BytePerBlock;
 	return lastEntryEndBlock + 1;
 }
+
+bool Volume::_restoreableRemove(entry e) {
+	for (auto it = this->entryTable.begin(); it != this->entryTable.end(); ++it) {
+		if (memcmp(it->fileName, e.fileName, sizeof(it->fileName)) == 0) {
+			// If the filenames match, remove the entry
+			it->fileStatus[0] = BYTE('d');
+			break;
+		}
+	}
+	string path = this->volumeName + this->extentionTail;
+	wstring temp = wstring(path.begin(), path.end());
+	LPCWSTR sw = temp.c_str();
+
+	if (!this->_writeEntryTable(this->entryTable, sw))
+		return false;
+
+	this->_readEntryTable(this->entryTable,sw);
+	return true;
+}
+bool Volume::_permanentRemove(entry e) {
+	string wp = this->volumeName + this->extentionTail;
+	wstring temp = wstring(wp.begin(), wp.end());
+	LPCWSTR sw = temp.c_str();
+	int i = reverseByte(e.startBlock, 4);
+	int endBlock = i + reverseByte(e.fileSize, 4) / BytePerBlock;
+
+	BYTE* buffer = createBlankOffets(BytePerBlock);
+
+	while (i <= endBlock) {
+
+		// Write data to output file
+		this->_writeBlock(i, buffer, sw);
+
+		i++;
+	}
+	this->_restoreableRemove(e);
+	return true;
+}
+
 
 BYTE* Volume::_readBlock(int block, LPCWSTR fileName) {
 	DWORD bytesRead;
@@ -571,7 +612,7 @@ bool Volume::importFile() {
 	cout << "Import file successfully!" << endl;
 	return true;
 }
-
+//console export file
 bool Volume::exportFile() {
 	string exportFile;
 	cout << "Enter export file: ";
@@ -594,7 +635,7 @@ bool Volume::exportFile() {
 		}
 	}
 	string exportPath;
-	cout << "Enter where to save it (E:\dic\\file.pdf): ";
+	cout << "Enter where to save it (E:\\dic\\file.pdf): ";
 	cin >> exportPath;
 	ofstream outputFile(exportPath, ios::binary);
 
@@ -635,3 +676,56 @@ bool Volume::exportFile() {
 	return true;
 }
 
+bool Volume::removeFile() {
+	cout << "1. Remove restoreable" << endl;
+	cout << "2. Remove permanently" << endl;
+	int choice;
+	cout << "Enter your choice: ";
+	cin >> choice;
+	
+	string fn;
+	cout << "Input file name: ";
+	cin >> fn;
+	entry* e = this->_searchEntry(fn);
+	if (e == nullptr) {
+		cout << "File not found!" << endl;
+		return false;
+	}
+	if (e->password[0] != BYTE(0))
+	{
+		string pw;
+		cout << "Input password: ";
+		cin >> pw;
+		if (!this->_verifyFilePassword(pw, *e))
+		{
+			cout << "Wrong password!" << endl;
+			return false;
+		}
+	}
+	if (choice == 1)
+	{
+		if (!this->_restoreableRemove(*e))
+		{
+			cout << "Fail to remove file!" << endl;
+			return false;
+		}
+		cout << "Remove file successfully!" << endl;
+		return true;
+	}
+	else if (choice == 2)
+	{
+		if (!this->_permanentRemove(*e))
+		{
+			cout << "Fail to remove file!" << endl;
+			return false;
+		}
+		cout << "Remove file successfully!" << endl;
+		return true;
+	}
+	else
+	{
+		cout << "Wrong choice!" << endl;
+		return false;
+	}	
+	return true;
+}
