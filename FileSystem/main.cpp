@@ -51,8 +51,11 @@ int main() {
 			myFS.changeFilePassword();
 			break; 
 		case 4:
+			myFS.importFile();
 			break; 
 		case 5:
+			myFS.exportFile();
+
 			break; 
 		case 6:
 			break;  

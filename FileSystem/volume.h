@@ -42,10 +42,11 @@ class Volume {
 		bool _verifyFilePassword(string password, entry e);
 		bool _changeFilePassword(entry e, string password);
 		// import and export file
-
+		int _getStartBlock();
+		// Remove file
 
 		BYTE* _readBlock(int block, LPCWSTR fileName);
-		bool _writeBlock(int block, BYTE* buffer, LPCWSTR fileName);
+		bool _writeBlock(int block, BYTE buffer[], LPCWSTR fileName);
 	public:
 		string volumeName;
 		int volumeSize; //in MB
@@ -64,5 +65,8 @@ class Volume {
 		void printEntryTable();
 
 		bool changeFilePassword();
-		void testEntry();
+
+		bool importFile();
+		bool exportFile();
+
 };

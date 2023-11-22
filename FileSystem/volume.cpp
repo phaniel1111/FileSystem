@@ -127,12 +127,24 @@ entry Volume::_createEntry(string name, string format, string password, int size
 			et.fileFormat[i] = BYTE(0);
 	}
 	et.fileStatus[0] = BYTE('a');
-	BYTE* temp = decToHexaLE(size, 4);
+
+	cout << "size: " << size << endl;
+	BYTE* t1 = decToHexaLE(size, 4);
+	cout << "Size2: " << reverseByte(t1, 4) << endl;
 	for (int i = 0; i < 4; i++)
-		et.fileSize[i] = temp[i];
-	BYTE* temp1 = decToHexaLE(start, 4);
+		et.fileSize[i] = t1[i];
+	cout << "Size3: " << reverseByte(et.fileSize, 4) << endl;
+
+	unsigned int unsignedValue = (unsigned int)start;
+	cout << "start: " << start << endl;
+	t1 = decToHexaLE(unsignedValue, 4);
+	cout << "Start2: " << reverseByte(t1, 4) << endl;
 	for (int i = 0; i < 4; i++)
-		et.startBlock[i] = temp1[i];
+	{
+		et.startBlock[i] = t1[i];
+	}
+	cout << "Start3: " << reverseByte(et.startBlock, 4) << endl;
+
 	//password
 	if (password != "0")
 	{
@@ -253,6 +265,16 @@ bool Volume::_changeFilePassword(entry e, string password) {
 	return true;
 }
 
+int Volume::_getStartBlock() {
+	if (this->entryTable.size() == 0)
+		return reverseByte(this->spBlock.entryTableSize, 4) / BytePerBlock;
+	entry lastEntry = this->entryTable.back();
+	int lastEntryBlock = reverseByte(lastEntry.startBlock, 4);
+	int lastEntrySize = reverseByte(lastEntry.fileSize, 4);
+	int lastEntryEndBlock = lastEntryBlock + lastEntrySize / BytePerBlock;
+	return lastEntryEndBlock + 1;
+}
+
 BYTE* Volume::_readBlock(int block, LPCWSTR fileName) {
 	DWORD bytesRead;
 	HANDLE hFile;
@@ -272,7 +294,8 @@ BYTE* Volume::_readBlock(int block, LPCWSTR fileName) {
 		return buffer;
 	return NULL;
 }
-bool Volume::_writeBlock(int block, BYTE* buffer, LPCWSTR fileName) {
+bool Volume::_writeBlock(int block, BYTE buffer[], LPCWSTR fileName) {
+
 	DWORD bytesRead;
 	HANDLE hFile;
 	bool flag;
@@ -455,6 +478,7 @@ void Volume::printEntryTable() {
 		this->printEntry(element);
 	}
 }
+//console change file password
 bool Volume::changeFilePassword() {
 	string fn;
 	cout << "Input file name: ";
@@ -487,31 +511,127 @@ bool Volume::changeFilePassword() {
 	return true;
 }
 
+//console import file
+bool Volume::importFile() {
+	string path;
+	cout << "Input file path: ";
+	cin >> path;
 
-// USE FOR TESTING
-void Volume::testEntry(){
-	string vN = this->volumeName + this->extentionTail;
-	wstring temp = wstring(vN.begin(), vN.end());
+	ifstream inputFile(path, ios::binary);
+
+	if (!inputFile.is_open())
+	{
+		cerr << "Can't access the file." << endl;
+		return false;
+	}
+	inputFile.seekg(0, ios::end);
+	streampos fileSize = inputFile.tellg();
+	int fileSizeInt = static_cast<int>(fileSize);
+	inputFile.seekg(0, ios::beg);
+	// create entry
+	string n;
+	cout << "Input file name: ";
+	cin >> n;
+	string f;
+	cout << "Input file format: ";
+	cin >> f;
+	string pw;
+	cout << "Input password (if not, enter 0): ";
+	cin >> pw;
+	int startBlock = this->_getStartBlock();
+	string wp = this->volumeName + this->extentionTail;
+	wstring temp = wstring(wp.begin(), wp.end());
 	LPCWSTR sw = temp.c_str();
-	/*
-	entry t = this->_createEntry("filename", "txt", 8, 257);
-	this->printEntry(t);
-	cout << endl;
 
-	
-	vector<entry> enT;
-	enT.push_back(t);
-	if(this->_writeEntryTable(enT,sw))
-		cout << "write entry table successfully" << endl;
-	else
-		cout << "fail to write entry table" << endl;
-	*/
-	vector<entry> enT2;
-	if (this->_readEntryTable(enT2, sw))
-		cout << "read entry table successfully" << endl;
-	else
-		cout << "fail to read entry table" << endl;
-	cout << endl << enT2.size() <<endl;
-	if(enT2.size() > 0)
-		this->printEntry(enT2[0]);
+	entry e = this->_createEntry(n, f, pw, fileSizeInt, startBlock);
+	this->entryTable.push_back(e);
+
+	this->_writeEntryTable(this->entryTable, sw);
+
+	int i =  startBlock;
+	// read data from input file
+	while (!inputFile.eof()) {
+		BYTE buffer[BytePerBlock];
+		// Read input file by block
+		inputFile.read(reinterpret_cast<char*>(buffer), BytePerBlock);
+		// Get the number of bytes actually read
+		streamsize bytesRead = inputFile.gcount();
+		// write data to volume
+		if (!this->_writeBlock(i, buffer, sw))
+		{
+			cout << "Fail to write block!" << endl;
+			return 0;
+		}
+		i++;
+		// check if the block is full
+		if (inputFile.eof()) {
+			break;
+		}
+	}
+	cout << "Import file successfully!" << endl;
+	return true;
 }
+
+bool Volume::exportFile() {
+	string exportFile;
+	cout << "Enter export file: ";
+	cin >> exportFile;
+
+	entry* e = this->_searchEntry(exportFile);
+	if (e == nullptr) {
+		cout << "File not found!" << endl;
+		return false;
+	}
+	if (e->password[0] != BYTE(0))
+	{
+		string pw;
+		cout << "Input password: ";
+		cin >> pw;
+		if (!this->_verifyFilePassword(pw, *e))
+		{
+			cout << "Wrong password!" << endl;
+			return false;
+		}
+	}
+	string exportPath;
+	cout << "Enter where to save it (E:\dic\\file.pdf): ";
+	cin >> exportPath;
+	ofstream outputFile(exportPath, ios::binary);
+
+	if (!outputFile.is_open()) {
+		cerr << "Can't create or access the export file." << endl;
+		return false;
+	}
+
+	string wp = this->volumeName + this->extentionTail;
+	wstring temp = wstring(wp.begin(), wp.end());
+	LPCWSTR sw = temp.c_str();
+	int i = reverseByte(e->startBlock, 4);
+	int endBlock = i + reverseByte(e->fileSize, 4) / BytePerBlock;
+	
+	while (i <= endBlock) {
+		BYTE *buffer = this->_readBlock(i, sw);
+
+		if (i == endBlock ) {
+			int n = reverseByte(e->fileSize, 4) % BytePerBlock;
+			outputFile.write(reinterpret_cast<char*>(buffer), n);
+			break;
+		}
+
+		// Read data from volume
+		if (!buffer) {
+			cerr << "Failed to read block " << i << " from volume." << endl;
+			return false;
+		}
+
+		// Write data to output file
+		outputFile.write(reinterpret_cast<char*>(buffer), BytePerBlock);
+
+		i++;
+	}
+
+	outputFile.close();
+	cout << "Export file successfully!" << endl;
+	return true;
+}
+

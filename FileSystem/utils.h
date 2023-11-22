@@ -1,7 +1,7 @@
 #include "header.h"
 
 BYTE* decToHexaLE(unsigned int num, int n);
-BYTE* createBlankOffets(int n);
+BYTE* createBlankOffsets(int n);
 BYTE hexToByte(const string& hexString);
 string byteToHex(unsigned char byte);
 int reverseByte(BYTE* byte, unsigned int count);

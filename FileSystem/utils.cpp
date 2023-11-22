@@ -1,22 +1,18 @@
 #include "utils.h"
 
-BYTE* decToHexaLE(unsigned int num, int n) {
-	BYTE* byte = createBlankOffets(n);
-	while (1) {
-		unsigned int dec = num;
-		int n = 0;
-		while (dec > 256) {
-			dec = dec >> 8;
-			n++;
-		}
-		byte[n] = BYTE(dec);
-		num = num - (dec << (8 * n));
-		if (n == 0)
-			break;
+BYTE* decToHexaLE(unsigned int num, int size) {
+	BYTE* byte = createBlankOffsets(size);
+	int index = 0;
+
+	while (num > 0 && index < size) {
+		byte[index] = BYTE(num & 0xFF);
+		num = num >> 8;
+		index++;
 	}
+
 	return byte;
 }
-BYTE* createBlankOffets(int n) {
+BYTE* createBlankOffsets(int n) {
 	BYTE* offsets = new BYTE[n];
 
 	for (int i = 0; i < n; i++) {
