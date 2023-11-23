@@ -10,7 +10,7 @@ int main() {
 	do {
 		do {
 			cout << "-----FILE SYSTEM-----" << endl;
-			cout << "Enter 1: Create new volume (Size: 2 MB)" << endl;
+			cout << "Enter 1: Create new volume" << endl;
 			cout << "Enter 2: Open existed volume" << endl;
 			cout << "Enter your choice: ";
 			cin >> btn1;
@@ -36,6 +36,7 @@ int main() {
 		cout << "Enter 4: Import file" << endl;
 		cout << "Enter 5: Export file" << endl;
 		cout << "Enter 6: Remove file" << endl;
+		cout << "Enter 7: Restore file" << endl;
 		cout << "Enter 0: Exit" << endl;
 		cout << "Enter your choice: ";
 		cin >> btn1;
@@ -58,7 +59,10 @@ int main() {
 			break; 
 		case 6:
 			myFS.removeFile();
-			break;  
+			break;
+		case 7:
+			myFS.restoreFile();
+			break;
 		default:
 			break;
 		}

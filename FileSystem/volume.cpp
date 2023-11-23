@@ -128,22 +128,16 @@ entry Volume::_createEntry(string name, string format, string password, int size
 	}
 	et.fileStatus[0] = BYTE('a');
 
-	cout << "size: " << size << endl;
 	BYTE* t1 = decToHexaLE(size, 4);
-	cout << "Size2: " << reverseByte(t1, 4) << endl;
 	for (int i = 0; i < 4; i++)
 		et.fileSize[i] = t1[i];
-	cout << "Size3: " << reverseByte(et.fileSize, 4) << endl;
 
 	unsigned int unsignedValue = (unsigned int)start;
-	cout << "start: " << start << endl;
 	t1 = decToHexaLE(unsignedValue, 4);
-	cout << "Start2: " << reverseByte(t1, 4) << endl;
 	for (int i = 0; i < 4; i++)
 	{
 		et.startBlock[i] = t1[i];
 	}
-	cout << "Start3: " << reverseByte(et.startBlock, 4) << endl;
 
 	//password
 	if (password != "0")
@@ -214,8 +208,7 @@ bool Volume::_readEntryTable(vector<entry>& entryTable, LPCWSTR fileName) {
 			memcpy(et.startBlock, buffer + j + 16, 4);
 			memcpy(et.password, buffer + j + 20, 12);
 			
-			if(et.fileStatus[0] != BYTE('d'))
-				entryTable.push_back(et);
+			entryTable.push_back(et);
 		}
 	}
 	endLoops:
@@ -277,11 +270,11 @@ int Volume::_getStartBlock() {
 	return lastEntryEndBlock + 1;
 }
 
-bool Volume::_restoreableRemove(entry e) {
+bool Volume::_restoreableRemove(entry e, char type) {
 	for (auto it = this->entryTable.begin(); it != this->entryTable.end(); ++it) {
 		if (memcmp(it->fileName, e.fileName, sizeof(it->fileName)) == 0) {
 			// If the filenames match, remove the entry
-			it->fileStatus[0] = BYTE('d');
+			it->fileStatus[0] = BYTE(type);
 			break;
 		}
 	}
@@ -311,7 +304,7 @@ bool Volume::_permanentRemove(entry e) {
 
 		i++;
 	}
-	this->_restoreableRemove(e);
+	this->_restoreableRemove(e, 'p');
 	return true;
 }
 
@@ -516,7 +509,8 @@ void Volume::printEntry(entry en) {
 void Volume::printEntryTable() {
 	cout << "Name\t\tFormat\t\tSize" << endl;
 	for (auto& element : this->entryTable) {
-		this->printEntry(element);
+		if (element.fileStatus[0] == BYTE('a'))
+			this->printEntry(element);
 	}
 }
 //console change file password
@@ -704,7 +698,7 @@ bool Volume::removeFile() {
 	}
 	if (choice == 1)
 	{
-		if (!this->_restoreableRemove(*e))
+		if (!this->_restoreableRemove(*e, 'd'))
 		{
 			cout << "Fail to remove file!" << endl;
 			return false;
@@ -727,5 +721,41 @@ bool Volume::removeFile() {
 		cout << "Wrong choice!" << endl;
 		return false;
 	}	
+	return true;
+}
+
+bool Volume::restoreFile() {
+	cout << "Removed files:" << endl;
+	cout << "Name\t\tFormat\t\tSize" << endl;
+	for (auto& element : this->entryTable) {
+		if (element.fileStatus[0] == BYTE('d'))
+			this->printEntry(element);
+	}
+	cout << "Enter file name: ";
+	string fn;
+	cin >> fn;
+	entry* e = this->_searchEntry(fn);
+	if (e == nullptr) {
+		cout << "File not found!" << endl;
+		return false;
+	}
+	for (auto it = this->entryTable.begin(); it != this->entryTable.end(); ++it) {
+		if (memcmp(it->fileName, e->fileName, sizeof(it->fileName)) == 0) {
+			// If the filenames match, remove the entry
+			it->fileStatus[0] = BYTE('a');
+			break;
+		}
+	}
+
+	string path = this->volumeName + this->extentionTail;
+	wstring temp = wstring(path.begin(), path.end());
+	LPCWSTR sw = temp.c_str();
+
+	if (!this->_writeEntryTable(this->entryTable, sw))
+	{
+		cout << "Fail to restore file!" << endl;
+		return false;
+	}
+	cout << "Restore file successfully!" << endl;
 	return true;
 }

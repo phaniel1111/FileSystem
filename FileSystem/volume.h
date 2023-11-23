@@ -44,7 +44,7 @@ class Volume {
 		// import and export file
 		int _getStartBlock();
 		// Remove file
-		bool _restoreableRemove(entry e);
+		bool _restoreableRemove(entry e, char type);
 		bool _permanentRemove(entry e);
 
 		BYTE* _readBlock(int block, LPCWSTR fileName);
@@ -72,4 +72,6 @@ class Volume {
 		bool exportFile();
 
 		bool removeFile();
+
+		bool restoreFile();
 };
